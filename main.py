@@ -1,7 +1,9 @@
+
 import os
 import secrets
 import hashlib
 import hmac
+
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
@@ -54,10 +56,14 @@ SUBSCRIPTION_DAYS = 30
 AI_MODEL = "gpt-4o-mini"
 
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL 환경 변수가 설정되지 않았습니다.")
+    raise RuntimeError(
+        "DATABASE_URL 환경 변수가 설정되지 않았습니다."
+    )
 
 if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET 환경 변수가 설정되지 않았습니다.")
+    raise RuntimeError(
+        "JWT_SECRET 환경 변수가 설정되지 않았습니다."
+    )
 
 # Railway PostgreSQL 주소 호환 처리
 if DATABASE_URL.startswith("postgres://"):
@@ -72,9 +78,14 @@ engine_options = {
 }
 
 if DATABASE_URL.startswith("sqlite"):
-    engine_options["connect_args"] = {"check_same_thread": False}
+    engine_options["connect_args"] = {
+        "check_same_thread": False
+    }
 
-engine = create_engine(DATABASE_URL, **engine_options)
+engine = create_engine(
+    DATABASE_URL,
+    **engine_options,
+)
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -108,7 +119,12 @@ def iso(value):
 
 def month_key(value):
     value = make_aware(value)
-    return value.strftime("%Y-%m") if value else None
+
+    return (
+        value.strftime("%Y-%m")
+        if value
+        else None
+    )
 
 
 # =========================================================
@@ -122,14 +138,40 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    password_salt: Mapped[str] = mapped_column(String(255))
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
 
-    is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
-    payment_status: Mapped[str] = mapped_column(String(30), default="free")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    username: Mapped[str] = mapped_column(
+        String(50),
+        unique=True,
+        index=True,
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255)
+    )
+
+    password_salt: Mapped[str] = mapped_column(
+        String(255)
+    )
+
+    is_premium: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+    )
+
+    payment_status: Mapped[str] = mapped_column(
+        String(30),
+        default="free",
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -140,12 +182,30 @@ class User(Base):
 class PaymentRequest(Base):
     __tablename__ = "payment_requests"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
 
-    depositor_name: Mapped[str] = mapped_column(String(100))
-    amount: Mapped[int] = mapped_column(Integer, default=SUBSCRIPTION_PRICE)
-    status: Mapped[str] = mapped_column(String(30), default="pending")
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True,
+    )
+
+    depositor_name: Mapped[str] = mapped_column(
+        String(100)
+    )
+
+    amount: Mapped[int] = mapped_column(
+        Integer,
+        default=SUBSCRIPTION_PRICE,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(30),
+        default="pending",
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -161,8 +221,16 @@ class PaymentRequest(Base):
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True,
+    )
 
     payment_request_id: Mapped[int | None] = mapped_column(
         ForeignKey("payment_requests.id"),
@@ -175,7 +243,9 @@ class Subscription(Base):
         default=utc_now,
     )
 
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -186,14 +256,36 @@ class Subscription(Base):
 class ChatUsage(Base):
     __tablename__ = "chat_usage"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
 
-    model: Mapped[str] = mapped_column(String(100), default=AI_MODEL)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True,
+    )
 
-    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    total_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    model: Mapped[str] = mapped_column(
+        String(100),
+        default=AI_MODEL,
+    )
+
+    input_tokens: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+    )
+
+    output_tokens: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+    )
+
+    total_tokens: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -205,13 +297,29 @@ class ChatUsage(Base):
 class Announcement(Base):
     __tablename__ = "announcements"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
 
-    title: Mapped[str] = mapped_column(String(100))
-    content: Mapped[str] = mapped_column(String(5000))
+    title: Mapped[str] = mapped_column(
+        String(100)
+    )
 
-    is_published: Mapped[bool] = mapped_column(Boolean, default=True)
-    is_important: Mapped[bool] = mapped_column(Boolean, default=False)
+    content: Mapped[str] = mapped_column(
+        String(5000)
+    )
+
+    is_published: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+    )
+
+    is_important: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -233,6 +341,7 @@ Base.metadata.create_all(bind=engine)
 # 기존 users 테이블에 is_active가 없는 경우에만 추가
 try:
     inspector = inspect(engine)
+
     user_columns = [
         column["name"]
         for column in inspector.get_columns("users")
@@ -243,9 +352,11 @@ try:
             connection.execute(
                 text(
                     "ALTER TABLE users "
-                    "ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE"
+                    "ADD COLUMN is_active BOOLEAN "
+                    "NOT NULL DEFAULT TRUE"
                 )
             )
+
 except Exception as error:
     print("DB 마이그레이션 확인:", error)
 
@@ -261,6 +372,7 @@ security = HTTPBearer(auto_error=False)
 
 def get_db():
     db = SessionLocal()
+
     try:
         yield db
     finally:
@@ -290,7 +402,9 @@ def create_access_token(user_id: int):
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials = Depends(
+        security
+    ),
     db: Session = Depends(get_db),
 ):
     if not credentials:
@@ -354,7 +468,10 @@ def require_admin(
     return True
 
 
-def get_subscription_state(db: Session, user: User):
+def get_subscription_state(
+    db: Session,
+    user: User,
+):
     now = utc_now()
 
     subscriptions = db.scalars(
@@ -366,7 +483,9 @@ def get_subscription_state(db: Session, user: User):
     active_subscription = None
 
     for subscription in subscriptions:
-        expires_at = make_aware(subscription.expires_at)
+        expires_at = make_aware(
+            subscription.expires_at
+        )
 
         if expires_at and expires_at > now:
             active_subscription = subscription
@@ -381,13 +500,19 @@ def get_subscription_state(db: Session, user: User):
         .order_by(PaymentRequest.created_at.desc())
     )
 
-    latest_subscription = subscriptions[0] if subscriptions else None
+    latest_subscription = (
+        subscriptions[0]
+        if subscriptions
+        else None
+    )
 
     if active_subscription:
         return {
             "is_premium": True,
             "status": "active",
-            "expires_at": iso(active_subscription.expires_at),
+            "expires_at": iso(
+                active_subscription.expires_at
+            ),
             "pending_payment": False,
         }
 
@@ -411,8 +536,14 @@ def get_subscription_state(db: Session, user: User):
     }
 
 
-def user_to_dict(db: Session, user: User):
-    subscription = get_subscription_state(db, user)
+def user_to_dict(
+    db: Session,
+    user: User,
+):
+    subscription = get_subscription_state(
+        db,
+        user,
+    )
 
     return {
         "id": user.id,
@@ -430,8 +561,15 @@ def user_to_dict(db: Session, user: User):
 # =========================================================
 
 class RegisterRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=50)
-    password: str = Field(min_length=6, max_length=100)
+    username: str = Field(
+        min_length=3,
+        max_length=50,
+    )
+
+    password: str = Field(
+        min_length=6,
+        max_length=100,
+    )
 
 
 class LoginRequest(BaseModel):
@@ -440,20 +578,38 @@ class LoginRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=20000)
+    message: str = Field(
+        min_length=1,
+        max_length=20000,
+    )
 
 
 class TransferRequestCreate(BaseModel):
-    depositor_name: str = Field(min_length=1, max_length=100)
+    depositor_name: str = Field(
+        min_length=1,
+        max_length=100,
+    )
 
 
 class AdminGrantRequest(BaseModel):
-    days: int = Field(default=30, ge=1, le=3650)
+    days: int = Field(
+        default=30,
+        ge=1,
+        le=3650,
+    )
 
 
 class AnnouncementRequest(BaseModel):
-    title: str = Field(min_length=1, max_length=100)
-    content: str = Field(min_length=1, max_length=5000)
+    title: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    content: str = Field(
+        min_length=1,
+        max_length=5000,
+    )
+
     is_published: bool = True
     is_important: bool = False
 
@@ -497,7 +653,9 @@ def register(
         )
 
     existing_user = db.scalar(
-        select(User).where(User.username == username)
+        select(User).where(
+            User.username == username
+        )
     )
 
     if existing_user:
@@ -511,7 +669,10 @@ def register(
     user = User(
         username=username,
         password_salt=salt,
-        password_hash=hash_password(request.password, salt),
+        password_hash=hash_password(
+            request.password,
+            salt,
+        ),
         is_premium=False,
         payment_status="free",
         is_active=True,
@@ -537,7 +698,9 @@ def login(
     db: Session = Depends(get_db),
 ):
     user = db.scalar(
-        select(User).where(User.username == request.username.strip())
+        select(User).where(
+            User.username == request.username.strip()
+        )
     )
 
     if not user:
@@ -707,7 +870,9 @@ def chat(
         )
 
     try:
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        client = OpenAI(
+            api_key=OPENAI_API_KEY
+        )
 
         response = client.responses.create(
             model=AI_MODEL,
@@ -721,22 +886,38 @@ def chat(
 
         answer = response.output_text
 
-        usage = getattr(response, "usage", None)
+        usage = getattr(
+            response,
+            "usage",
+            None,
+        )
 
         input_tokens = int(
-            getattr(usage, "input_tokens", 0) or 0
+            getattr(
+                usage,
+                "input_tokens",
+                0,
+            ) or 0
         )
 
         output_tokens = int(
-            getattr(usage, "output_tokens", 0) or 0
+            getattr(
+                usage,
+                "output_tokens",
+                0,
+            ) or 0
         )
 
         total_tokens = int(
-            getattr(usage, "total_tokens", 0)
-            or (input_tokens + output_tokens)
+            getattr(
+                usage,
+                "total_tokens",
+                0,
+            ) or (
+                input_tokens + output_tokens
+            )
         )
 
-        # 성공한 채팅의 사용량만 저장
         usage_record = ChatUsage(
             user_id=user.id,
             model=AI_MODEL,
@@ -764,7 +945,11 @@ def chat(
 
     except Exception as error:
         db.rollback()
-        print("OpenAI 채팅 오류:", str(error))
+
+        print(
+            "OpenAI 채팅 오류:",
+            str(error),
+        )
 
         raise HTTPException(
             status_code=500,
@@ -784,12 +969,19 @@ def admin_subscription_requests(
 ):
     query = (
         select(PaymentRequest, User)
-        .join(User, PaymentRequest.user_id == User.id)
-        .order_by(PaymentRequest.created_at.desc())
+        .join(
+            User,
+            PaymentRequest.user_id == User.id,
+        )
+        .order_by(
+            PaymentRequest.created_at.desc()
+        )
     )
 
     if status != "all":
-        query = query.where(PaymentRequest.status == status)
+        query = query.where(
+            PaymentRequest.status == status
+        )
 
     rows = db.execute(query).all()
 
@@ -811,14 +1003,20 @@ def admin_subscription_requests(
     }
 
 
-def approve_payment(db: Session, payment: PaymentRequest):
+def approve_payment(
+    db: Session,
+    payment: PaymentRequest,
+):
     if payment.status != "pending":
         raise HTTPException(
             status_code=400,
             detail="이미 처리된 신청입니다.",
         )
 
-    user = db.get(User, payment.user_id)
+    user = db.get(
+        User,
+        payment.user_id,
+    )
 
     if not user:
         raise HTTPException(
@@ -834,11 +1032,15 @@ def approve_payment(db: Session, payment: PaymentRequest):
             Subscription.user_id == user.id,
             Subscription.expires_at > now,
         )
-        .order_by(Subscription.expires_at.desc())
+        .order_by(
+            Subscription.expires_at.desc()
+        )
     )
 
     if current_subscription:
-        start_time = make_aware(current_subscription.expires_at)
+        start_time = make_aware(
+            current_subscription.expires_at
+        )
     else:
         start_time = now
 
@@ -846,7 +1048,10 @@ def approve_payment(db: Session, payment: PaymentRequest):
         user_id=user.id,
         payment_request_id=payment.id,
         started_at=now,
-        expires_at=start_time + timedelta(days=SUBSCRIPTION_DAYS),
+        expires_at=(
+            start_time
+            + timedelta(days=SUBSCRIPTION_DAYS)
+        ),
     )
 
     payment.status = "approved"
@@ -864,13 +1069,18 @@ def approve_payment(db: Session, payment: PaymentRequest):
     }
 
 
-@app.post("/admin/subscription-requests/{payment_id}/approve")
+@app.post(
+    "/admin/subscription-requests/{payment_id}/approve"
+)
 def admin_approve_payment(
     payment_id: int,
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    payment = db.get(PaymentRequest, payment_id)
+    payment = db.get(
+        PaymentRequest,
+        payment_id,
+    )
 
     if not payment:
         raise HTTPException(
@@ -878,16 +1088,24 @@ def admin_approve_payment(
             detail="입금 신청을 찾을 수 없습니다.",
         )
 
-    return approve_payment(db, payment)
+    return approve_payment(
+        db,
+        payment,
+    )
 
 
-@app.post("/admin/subscription-requests/{payment_id}/reject")
+@app.post(
+    "/admin/subscription-requests/{payment_id}/reject"
+)
 def admin_reject_payment(
     payment_id: int,
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    payment = db.get(PaymentRequest, payment_id)
+    payment = db.get(
+        PaymentRequest,
+        payment_id,
+    )
 
     if not payment:
         raise HTTPException(
@@ -923,29 +1141,45 @@ def admin_members(
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    query = select(User).order_by(User.created_at.desc())
+    query = select(User).order_by(
+        User.created_at.desc()
+    )
 
     if search.strip():
         query = query.where(
-            User.username.ilike(f"%{search.strip()}%")
+            User.username.ilike(
+                f"%{search.strip()}%"
+            )
         )
 
-    users = db.scalars(query.limit(500)).all()
+    users = db.scalars(
+        query.limit(500)
+    ).all()
 
     result = []
 
     for user in users:
-        state = get_subscription_state(db, user)
+        state = get_subscription_state(
+            db,
+            user,
+        )
 
-        if status == "premium" and not state["is_premium"]:
-            continue
-
-        if status == "free" and (
-            state["is_premium"] or not user.is_active
+        if (
+            status == "premium"
+            and not state["is_premium"]
         ):
             continue
 
-        if status == "suspended" and user.is_active:
+        if status == "free" and (
+            state["is_premium"]
+            or not user.is_active
+        ):
+            continue
+
+        if (
+            status == "suspended"
+            and user.is_active
+        ):
             continue
 
         result.append({
@@ -967,7 +1201,10 @@ def admin_member_detail(
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.get(
+        User,
+        user_id,
+    )
 
     if not user:
         raise HTTPException(
@@ -977,37 +1214,65 @@ def admin_member_detail(
 
     payments = db.scalars(
         select(PaymentRequest)
-        .where(PaymentRequest.user_id == user_id)
-        .order_by(PaymentRequest.created_at.desc())
+        .where(
+            PaymentRequest.user_id == user_id
+        )
+        .order_by(
+            PaymentRequest.created_at.desc()
+        )
         .limit(100)
     ).all()
 
     subscriptions = db.scalars(
         select(Subscription)
-        .where(Subscription.user_id == user_id)
-        .order_by(Subscription.created_at.desc())
+        .where(
+            Subscription.user_id == user_id
+        )
+        .order_by(
+            Subscription.created_at.desc()
+        )
         .limit(100)
     ).all()
 
     usage_rows = db.scalars(
         select(ChatUsage)
-        .where(ChatUsage.user_id == user_id)
-        .order_by(ChatUsage.created_at.desc())
+        .where(
+            ChatUsage.user_id == user_id
+        )
+        .order_by(
+            ChatUsage.created_at.desc()
+        )
         .limit(100)
     ).all()
 
     usage_summary = db.execute(
         select(
             func.count(ChatUsage.id),
-            func.coalesce(func.sum(ChatUsage.input_tokens), 0),
-            func.coalesce(func.sum(ChatUsage.output_tokens), 0),
-            func.coalesce(func.sum(ChatUsage.total_tokens), 0),
-        ).where(ChatUsage.user_id == user_id)
+            func.coalesce(
+                func.sum(ChatUsage.input_tokens),
+                0,
+            ),
+            func.coalesce(
+                func.sum(ChatUsage.output_tokens),
+                0,
+            ),
+            func.coalesce(
+                func.sum(ChatUsage.total_tokens),
+                0,
+            ),
+        ).where(
+            ChatUsage.user_id == user_id
+        )
     ).one()
 
     return {
         "success": True,
-        "member": user_to_dict(db, user),
+
+        "member": user_to_dict(
+            db,
+            user,
+        ),
+
         "payments": [
             {
                 "id": item.id,
@@ -1019,6 +1284,7 @@ def admin_member_detail(
             }
             for item in payments
         ],
+
         "subscriptions": [
             {
                 "id": item.id,
@@ -1028,12 +1294,22 @@ def admin_member_detail(
             }
             for item in subscriptions
         ],
+
         "usage_summary": {
-            "chat_count": int(usage_summary[0] or 0),
-            "input_tokens": int(usage_summary[1] or 0),
-            "output_tokens": int(usage_summary[2] or 0),
-            "total_tokens": int(usage_summary[3] or 0),
+            "chat_count": int(
+                usage_summary[0] or 0
+            ),
+            "input_tokens": int(
+                usage_summary[1] or 0
+            ),
+            "output_tokens": int(
+                usage_summary[2] or 0
+            ),
+            "total_tokens": int(
+                usage_summary[3] or 0
+            ),
         },
+
         "recent_usage": [
             {
                 "id": item.id,
@@ -1048,14 +1324,19 @@ def admin_member_detail(
     }
 
 
-@app.post("/admin/members/{user_id}/grant-subscription")
+@app.post(
+    "/admin/members/{user_id}/grant-subscription"
+)
 def admin_grant_subscription(
     user_id: int,
     request: AdminGrantRequest,
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.get(
+        User,
+        user_id,
+    )
 
     if not user:
         raise HTTPException(
@@ -1077,11 +1358,15 @@ def admin_grant_subscription(
             Subscription.user_id == user_id,
             Subscription.expires_at > now,
         )
-        .order_by(Subscription.expires_at.desc())
+        .order_by(
+            Subscription.expires_at.desc()
+        )
     )
 
     if current_subscription:
-        start_time = make_aware(current_subscription.expires_at)
+        start_time = make_aware(
+            current_subscription.expires_at
+        )
     else:
         start_time = now
 
@@ -1102,7 +1387,10 @@ def admin_grant_subscription(
         user_id=user_id,
         payment_request_id=payment.id,
         started_at=now,
-        expires_at=start_time + timedelta(days=request.days),
+        expires_at=(
+            start_time
+            + timedelta(days=request.days)
+        ),
     )
 
     user.is_premium = True
@@ -1113,17 +1401,24 @@ def admin_grant_subscription(
 
     return {
         "success": True,
-        "message": f"{request.days}일 구독을 지급했습니다.",
+        "message": (
+            f"{request.days}일 구독을 지급했습니다."
+        ),
     }
 
 
-@app.post("/admin/members/{user_id}/revoke-subscription")
+@app.post(
+    "/admin/members/{user_id}/revoke-subscription"
+)
 def admin_revoke_subscription(
     user_id: int,
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.get(
+        User,
+        user_id,
+    )
 
     if not user:
         raise HTTPException(
@@ -1154,13 +1449,18 @@ def admin_revoke_subscription(
     }
 
 
-@app.post("/admin/members/{user_id}/suspend")
+@app.post(
+    "/admin/members/{user_id}/suspend"
+)
 def admin_suspend_member(
     user_id: int,
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.get(
+        User,
+        user_id,
+    )
 
     if not user:
         raise HTTPException(
@@ -1169,6 +1469,7 @@ def admin_suspend_member(
         )
 
     user.is_active = False
+
     db.commit()
 
     return {
@@ -1177,13 +1478,18 @@ def admin_suspend_member(
     }
 
 
-@app.post("/admin/members/{user_id}/activate")
+@app.post(
+    "/admin/members/{user_id}/activate"
+)
 def admin_activate_member(
     user_id: int,
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    user = db.get(User, user_id)
+    user = db.get(
+        User,
+        user_id,
+    )
 
     if not user:
         raise HTTPException(
@@ -1192,6 +1498,7 @@ def admin_activate_member(
         )
 
     user.is_active = True
+
     db.commit()
 
     return {
@@ -1212,26 +1519,44 @@ def admin_stats(
     now = utc_now()
     today = now.date()
 
-    users = db.scalars(select(User)).all()
+    users = db.scalars(
+        select(User)
+    ).all()
 
     total_members = len(users)
-    suspended_members = sum(1 for user in users if not user.is_active)
+
+    suspended_members = sum(
+        1
+        for user in users
+        if not user.is_active
+    )
 
     premium_members = 0
 
     for user in users:
         if user.is_active:
-            state = get_subscription_state(db, user)
+            state = get_subscription_state(
+                db,
+                user,
+            )
+
             if state["is_premium"]:
                 premium_members += 1
 
     free_members = max(
         0,
-        total_members - suspended_members - premium_members,
+        total_members
+        - suspended_members
+        - premium_members,
     )
 
+    # -----------------------------------------------------
     # 최근 7일 가입자
-    registration_start = now - timedelta(days=6)
+    # -----------------------------------------------------
+
+    registration_start = (
+        now - timedelta(days=6)
+    )
 
     recent_users = db.scalars(
         select(User).where(
@@ -1242,19 +1567,74 @@ def admin_stats(
     daily_registrations = defaultdict(int)
 
     for offset in range(7):
-        day = today - timedelta(days=6 - offset)
-        daily_registrations[day.isoformat()] = 0
+        day = today - timedelta(
+            days=6 - offset
+        )
+
+        daily_registrations[
+            day.isoformat()
+        ] = 0
 
     for user in recent_users:
-        created = make_aware(user.created_at)
+        created = make_aware(
+            user.created_at
+        )
+
         if created:
             key = created.date().isoformat()
+
             if key in daily_registrations:
                 daily_registrations[key] += 1
 
-    # 최근 6개월 매출 및 유료 구독 승인 건수
-    six_month_start = now - timedelta(days=183)
+    # -----------------------------------------------------
+    # 최근 6개월 달력 기준 매출 통계
+    # -----------------------------------------------------
 
+    current_month_index = (
+        now.year * 12
+        + now.month
+        - 1
+    )
+
+    first_month_index = (
+        current_month_index - 5
+    )
+
+    first_year = (
+        first_month_index // 12
+    )
+
+    first_month = (
+        first_month_index % 12 + 1
+    )
+
+    six_month_start = datetime(
+        first_year,
+        first_month,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    monthly_revenue = defaultdict(int)
+
+    monthly_paid_subscriptions = defaultdict(int)
+
+    # 최근 6개월을 오래된 달부터 생성
+    for offset in range(5, -1, -1):
+        month_index = (
+            current_month_index - offset
+        )
+
+        year = month_index // 12
+        month = month_index % 12 + 1
+
+        key = f"{year:04d}-{month:02d}"
+
+        monthly_revenue[key] = 0
+
+        monthly_paid_subscriptions[key] = 0
+
+    # 실제 승인된 유료 결제 조회
     approved_payments = db.scalars(
         select(PaymentRequest).where(
             PaymentRequest.status == "approved",
@@ -1262,80 +1642,119 @@ def admin_stats(
         )
     ).all()
 
-    monthly_revenue = defaultdict(int)
-    monthly_paid_subscriptions = defaultdict(int)
-
-    for offset in range(6):
-        month_date = (
-            now.replace(day=1)
-            - timedelta(days=offset * 30)
-        )
-
-        key = month_key(month_date)
-        monthly_revenue[key] = 0
-        monthly_paid_subscriptions[key] = 0
-
     for payment in approved_payments:
         approved_time = make_aware(
-            payment.reviewed_at or payment.created_at
+            payment.reviewed_at
+            or payment.created_at
         )
 
-        if not approved_time or approved_time < six_month_start:
+        if not approved_time:
             continue
 
-        key = month_key(approved_time)
+        if approved_time < six_month_start:
+            continue
+
+        key = month_key(
+            approved_time
+        )
 
         if key in monthly_revenue:
-            monthly_revenue[key] += int(payment.amount or 0)
+            monthly_revenue[key] += int(
+                payment.amount or 0
+            )
+
             monthly_paid_subscriptions[key] += 1
 
-    # 대시보드 월 표시를 시간순으로 정렬
-    month_labels = sorted(monthly_revenue.keys())
+    # -----------------------------------------------------
+    # 승인 대기 결제
+    # -----------------------------------------------------
 
     pending_count = db.scalar(
-        select(func.count(PaymentRequest.id)).where(
+        select(
+            func.count(PaymentRequest.id)
+        ).where(
             PaymentRequest.status == "pending"
         )
     ) or 0
 
+    # -----------------------------------------------------
+    # 전체 AI 사용량
+    # -----------------------------------------------------
+
     usage_summary = db.execute(
         select(
             func.count(ChatUsage.id),
-            func.coalesce(func.sum(ChatUsage.input_tokens), 0),
-            func.coalesce(func.sum(ChatUsage.output_tokens), 0),
-            func.coalesce(func.sum(ChatUsage.total_tokens), 0),
+
+            func.coalesce(
+                func.sum(ChatUsage.input_tokens),
+                0,
+            ),
+
+            func.coalesce(
+                func.sum(ChatUsage.output_tokens),
+                0,
+            ),
+
+            func.coalesce(
+                func.sum(ChatUsage.total_tokens),
+                0,
+            ),
         )
     ).one()
 
     return {
         "success": True,
+
         "members": {
             "total": total_members,
             "premium": premium_members,
             "free": free_members,
             "suspended": suspended_members,
         },
+
         "daily_registrations": [
             {
                 "date": key,
                 "count": daily_registrations[key],
             }
-            for key in sorted(daily_registrations.keys())
+            for key in sorted(
+                daily_registrations.keys()
+            )
         ],
+
         "monthly_revenue": [
             {
                 "month": key,
                 "revenue": monthly_revenue[key],
-                "paid_subscriptions": monthly_paid_subscriptions[key],
+                "paid_subscriptions": (
+                    monthly_paid_subscriptions[key]
+                ),
             }
-            for key in month_labels
+            for key in sorted(
+                monthly_revenue.keys()
+            )
         ],
-        "pending_payment_requests": int(pending_count),
+
+        "pending_payment_requests": int(
+            pending_count
+        ),
+
         "usage": {
-            "chat_count": int(usage_summary[0] or 0),
-            "input_tokens": int(usage_summary[1] or 0),
-            "output_tokens": int(usage_summary[2] or 0),
-            "total_tokens": int(usage_summary[3] or 0),
+            "chat_count": int(
+                usage_summary[0] or 0
+            ),
+
+            "input_tokens": int(
+                usage_summary[1] or 0
+            ),
+
+            "output_tokens": int(
+                usage_summary[2] or 0
+            ),
+
+            "total_tokens": int(
+                usage_summary[3] or 0
+            ),
         },
     }
 
@@ -1354,39 +1773,76 @@ def admin_usage(
         select(
             User.id,
             User.username,
-            func.count(ChatUsage.id).label("chat_count"),
+
+            func.count(
+                ChatUsage.id
+            ).label("chat_count"),
+
             func.coalesce(
-                func.sum(ChatUsage.input_tokens), 0
+                func.sum(ChatUsage.input_tokens),
+                0,
             ).label("input_tokens"),
+
             func.coalesce(
-                func.sum(ChatUsage.output_tokens), 0
+                func.sum(ChatUsage.output_tokens),
+                0,
             ).label("output_tokens"),
+
             func.coalesce(
-                func.sum(ChatUsage.total_tokens), 0
+                func.sum(ChatUsage.total_tokens),
+                0,
             ).label("total_tokens"),
         )
-        .outerjoin(ChatUsage, ChatUsage.user_id == User.id)
-        .group_by(User.id, User.username)
-        .order_by(func.coalesce(func.sum(ChatUsage.total_tokens), 0).desc())
+        .outerjoin(
+            ChatUsage,
+            ChatUsage.user_id == User.id,
+        )
+        .group_by(
+            User.id,
+            User.username,
+        )
+        .order_by(
+            func.coalesce(
+                func.sum(ChatUsage.total_tokens),
+                0,
+            ).desc()
+        )
     )
 
     if search.strip():
         query = query.where(
-            User.username.ilike(f"%{search.strip()}%")
+            User.username.ilike(
+                f"%{search.strip()}%"
+            )
         )
 
-    rows = db.execute(query.limit(500)).all()
+    rows = db.execute(
+        query.limit(500)
+    ).all()
 
     return {
         "success": True,
+
         "usage": [
             {
                 "user_id": row.id,
                 "username": row.username,
-                "chat_count": int(row.chat_count or 0),
-                "input_tokens": int(row.input_tokens or 0),
-                "output_tokens": int(row.output_tokens or 0),
-                "total_tokens": int(row.total_tokens or 0),
+
+                "chat_count": int(
+                    row.chat_count or 0
+                ),
+
+                "input_tokens": int(
+                    row.input_tokens or 0
+                ),
+
+                "output_tokens": int(
+                    row.output_tokens or 0
+                ),
+
+                "total_tokens": int(
+                    row.total_tokens or 0
+                ),
             }
             for row in rows
         ],
@@ -1404,12 +1860,15 @@ def admin_get_announcements(
 ):
     items = db.scalars(
         select(Announcement)
-        .order_by(Announcement.created_at.desc())
+        .order_by(
+            Announcement.created_at.desc()
+        )
         .limit(200)
     ).all()
 
     return {
         "success": True,
+
         "announcements": [
             {
                 "id": item.id,
@@ -1453,14 +1912,19 @@ def admin_create_announcement(
     }
 
 
-@app.put("/admin/announcements/{announcement_id}")
+@app.put(
+    "/admin/announcements/{announcement_id}"
+)
 def admin_update_announcement(
     announcement_id: int,
     request: AnnouncementRequest,
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    item = db.get(Announcement, announcement_id)
+    item = db.get(
+        Announcement,
+        announcement_id,
+    )
 
     if not item:
         raise HTTPException(
@@ -1482,13 +1946,18 @@ def admin_update_announcement(
     }
 
 
-@app.delete("/admin/announcements/{announcement_id}")
+@app.delete(
+    "/admin/announcements/{announcement_id}"
+)
 def admin_delete_announcement(
     announcement_id: int,
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    item = db.get(Announcement, announcement_id)
+    item = db.get(
+        Announcement,
+        announcement_id,
+    )
 
     if not item:
         raise HTTPException(
@@ -1516,8 +1985,10 @@ ADMIN_HTML = r"""
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>에코 AI 관리자</title>
+
 <style>
 *{box-sizing:border-box}
+
 body{
     margin:0;
     padding:24px;
@@ -1525,8 +1996,17 @@ body{
     color:#f4f1ff;
     font-family:Arial,"Malgun Gothic",sans-serif
 }
-h1{color:#67e8f9;margin-top:0}
-h2{font-size:20px;margin-top:0}
+
+h1{
+    color:#67e8f9;
+    margin-top:0
+}
+
+h2{
+    font-size:20px;
+    margin-top:0
+}
+
 button{
     border:0;
     border-radius:8px;
@@ -1536,9 +2016,19 @@ button{
     cursor:pointer;
     margin:3px
 }
-button:hover{filter:brightness(1.15)}
-button.red{background:#b83255}
-button.gray{background:#34324a}
+
+button:hover{
+    filter:brightness(1.15)
+}
+
+button.red{
+    background:#b83255
+}
+
+button.gray{
+    background:#34324a
+}
+
 input,textarea,select{
     width:100%;
     padding:11px;
@@ -1548,7 +2038,12 @@ input,textarea,select{
     background:#17152b;
     color:white
 }
-textarea{min-height:110px;resize:vertical}
+
+textarea{
+    min-height:110px;
+    resize:vertical
+}
+
 .panel{
     background:#151329;
     border:1px solid #302b4b;
@@ -1556,589 +2051,1611 @@ textarea{min-height:110px;resize:vertical}
     padding:18px;
     margin:16px 0
 }
-.tabs{display:flex;flex-wrap:wrap;gap:5px;margin:18px 0}
-.tabs button{background:#292541}
-.tabs button.active{background:#713cff}
+
+.tabs{
+    display:flex;
+    flex-wrap:wrap;
+    gap:5px;
+    margin:18px 0
+}
+
+.tabs button{
+    background:#292541
+}
+
+.tabs button.active{
+    background:#713cff
+}
+
 .grid{
     display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+    grid-template-columns:repeat(
+        auto-fit,
+        minmax(170px,1fr)
+    );
     gap:12px
 }
+
 .stat{
     background:#211d3b;
     border-radius:12px;
     padding:16px
 }
+
 .stat strong{
     display:block;
     font-size:25px;
     color:#67e8f9;
     margin-top:8px
 }
-table{width:100%;border-collapse:collapse;min-width:650px}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:650px
+}
+
 th,td{
     text-align:left;
     padding:11px;
     border-bottom:1px solid #34304e;
     vertical-align:top
 }
-th{color:#a9a2c9}
-.table-wrap{overflow-x:auto}
-.small{font-size:13px;color:#aaa4c5}
-.hidden{display:none}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.notice{padding:12px;background:#211d3b;border-radius:8px;margin:8px 0}
+
+th{
+    color:#a9a2c9
+}
+
+.table-wrap{
+    overflow-x:auto
+}
+
+.small{
+    font-size:13px;
+    color:#aaa4c5
+}
+
+.hidden{
+    display:none
+}
+
+.row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px
+}
+
+.notice{
+    padding:12px;
+    background:#211d3b;
+    border-radius:8px;
+    margin:8px 0
+}
+
 @media(max-width:600px){
-    body{padding:12px}
-    .row{grid-template-columns:1fr}
+    body{
+        padding:12px
+    }
+
+    .row{
+        grid-template-columns:1fr
+    }
 }
 </style>
 </head>
+
 <body>
 
 <h1>⚡ 에코 AI 관리자 센터</h1>
-<p class="small">회원 · 결제 · 통계 · 공지사항 · AI 사용량 관리</p>
+
+<p class="small">
+회원 · 결제 · 통계 · 공지사항 · AI 사용량 관리
+</p>
 
 <div class="panel" id="loginPanel">
+
     <h2>관리자 인증</h2>
-    <input id="adminKey" type="password" placeholder="ADMIN_API_KEY 입력">
+
+    <input
+        id="adminKey"
+        type="password"
+        placeholder="ADMIN_API_KEY 입력"
+    >
+
     <button onclick="login()">로그인</button>
+
     <p id="loginMessage" class="small"></p>
+
 </div>
+
 
 <div id="mainPanel" class="hidden">
+
     <div class="tabs">
-        <button class="active" onclick="showTab('stats',this)">통계</button>
-        <button onclick="showTab('members',this)">회원 관리</button>
-        <button onclick="showTab('payments',this)">입금 신청</button>
-        <button onclick="showTab('announcements',this)">공지사항</button>
-        <button onclick="showTab('usage',this)">AI 사용량</button>
+
+        <button
+            class="active"
+            onclick="showTab('stats',this)"
+        >통계</button>
+
+        <button
+            onclick="showTab('members',this)"
+        >회원 관리</button>
+
+        <button
+            onclick="showTab('payments',this)"
+        >입금 신청</button>
+
+        <button
+            onclick="showTab('announcements',this)"
+        >공지사항</button>
+
+        <button
+            onclick="showTab('usage',this)"
+        >AI 사용량</button>
+
     </div>
 
+
+    <!-- 통계 -->
+
     <section id="stats" class="tab">
+
         <div class="panel">
+
             <h2>서비스 통계</h2>
-            <button onclick="loadStats()">새로고침</button>
-            <div class="grid" id="statCards"></div>
+
+            <button onclick="loadStats()">
+                새로고침
+            </button>
+
+            <div
+                class="grid"
+                id="statCards"
+            ></div>
+
         </div>
+
+
         <div class="panel">
+
             <h2>최근 7일 가입자</h2>
+
             <div id="dailyStats"></div>
+
         </div>
+
+
         <div class="panel">
+
             <h2>최근 6개월 매출 및 유료 구독</h2>
+
             <div id="monthlyStats"></div>
-            <p class="small">실제 승인된 결제 금액만 집계합니다. 관리자 무료 지급은 매출에서 제외됩니다.</p>
+
+            <p class="small">
+                실제 승인된 결제 금액만 집계합니다.
+                관리자 무료 지급은 매출에서 제외됩니다.
+            </p>
+
         </div>
+
+
         <div class="panel">
+
             <h2>AI 사용량 전체</h2>
+
             <div id="totalUsage"></div>
+
         </div>
+
     </section>
 
-    <section id="members" class="tab hidden">
+
+    <!-- 회원 관리 -->
+
+    <section
+        id="members"
+        class="tab hidden"
+    >
+
         <div class="panel">
+
             <h2>회원 관리</h2>
+
             <div class="row">
-                <input id="memberSearch" placeholder="아이디 검색">
+
+                <input
+                    id="memberSearch"
+                    placeholder="아이디 검색"
+                >
+
                 <select id="memberStatus">
-                    <option value="all">전체 회원</option>
-                    <option value="premium">프리미엄</option>
-                    <option value="free">무료 회원</option>
-                    <option value="suspended">정지 회원</option>
+
+                    <option value="all">
+                        전체 회원
+                    </option>
+
+                    <option value="premium">
+                        프리미엄
+                    </option>
+
+                    <option value="free">
+                        무료 회원
+                    </option>
+
+                    <option value="suspended">
+                        정지 회원
+                    </option>
+
                 </select>
+
             </div>
-            <button onclick="loadMembers()">검색</button>
-            <div class="table-wrap" id="memberTable"></div>
+
+            <button onclick="loadMembers()">
+                검색
+            </button>
+
+            <div
+                class="table-wrap"
+                id="memberTable"
+            ></div>
+
         </div>
-        <div class="panel hidden" id="memberDetail"></div>
+
+
+        <div
+            class="panel hidden"
+            id="memberDetail"
+        ></div>
+
     </section>
 
-    <section id="payments" class="tab hidden">
+
+    <!-- 입금 신청 -->
+
+    <section
+        id="payments"
+        class="tab hidden"
+    >
+
         <div class="panel">
+
             <h2>입금 신청 관리</h2>
+
             <select id="paymentStatus">
-                <option value="pending">승인 대기</option>
-                <option value="approved">승인 완료</option>
-                <option value="rejected">거절</option>
-                <option value="all">전체</option>
+
+                <option value="pending">
+                    승인 대기
+                </option>
+
+                <option value="approved">
+                    승인 완료
+                </option>
+
+                <option value="rejected">
+                    거절
+                </option>
+
+                <option value="all">
+                    전체
+                </option>
+
             </select>
-            <button onclick="loadPayments()">조회</button>
-            <div class="table-wrap" id="paymentTable"></div>
+
+            <button onclick="loadPayments()">
+                조회
+            </button>
+
+            <div
+                class="table-wrap"
+                id="paymentTable"
+            ></div>
+
         </div>
+
     </section>
 
-    <section id="announcements" class="tab hidden">
+
+    <!-- 공지사항 -->
+
+    <section
+        id="announcements"
+        class="tab hidden"
+    >
+
         <div class="panel">
+
             <h2>공지사항 작성</h2>
-            <input id="announcementId" type="hidden">
+
+            <input
+                id="announcementId"
+                type="hidden"
+            >
+
             <label>제목</label>
-            <input id="announcementTitle" maxlength="100" placeholder="공지사항 제목">
+
+            <input
+                id="announcementTitle"
+                maxlength="100"
+                placeholder="공지사항 제목"
+            >
+
             <label>내용</label>
-            <textarea id="announcementContent" maxlength="5000" placeholder="공지사항 내용을 입력하세요."></textarea>
-            <label><input id="announcementPublished" type="checkbox" checked style="width:auto"> 게시하기</label>
-            <label><input id="announcementImportant" type="checkbox" style="width:auto"> 중요 공지</label>
+
+            <textarea
+                id="announcementContent"
+                maxlength="5000"
+                placeholder="공지사항 내용을 입력하세요."
+            ></textarea>
+
+            <label>
+                <input
+                    id="announcementPublished"
+                    type="checkbox"
+                    checked
+                    style="width:auto"
+                >
+                게시하기
+            </label>
+
+            <label>
+                <input
+                    id="announcementImportant"
+                    type="checkbox"
+                    style="width:auto"
+                >
+                중요 공지
+            </label>
+
             <br>
-            <button onclick="saveAnnouncement()">저장</button>
-            <button class="gray" onclick="clearAnnouncementForm()">새 공지 작성</button>
+
+            <button onclick="saveAnnouncement()">
+                저장
+            </button>
+
+            <button
+                class="gray"
+                onclick="clearAnnouncementForm()"
+            >
+                새 공지 작성
+            </button>
+
         </div>
+
+
         <div class="panel">
+
             <h2>등록된 공지사항</h2>
-            <button onclick="loadAnnouncements()">새로고침</button>
+
+            <button onclick="loadAnnouncements()">
+                새로고침
+            </button>
+
             <div id="announcementList"></div>
+
         </div>
+
     </section>
 
-    <section id="usage" class="tab hidden">
+
+    <!-- AI 사용량 -->
+
+    <section
+        id="usage"
+        class="tab hidden"
+    >
+
         <div class="panel">
+
             <h2>회원별 AI 사용량</h2>
-            <input id="usageSearch" placeholder="회원 아이디 검색">
-            <button onclick="loadUsage()">조회</button>
-            <div class="table-wrap" id="usageTable"></div>
+
+            <input
+                id="usageSearch"
+                placeholder="회원 아이디 검색"
+            >
+
+            <button onclick="loadUsage()">
+                조회
+            </button>
+
+            <div
+                class="table-wrap"
+                id="usageTable"
+            ></div>
+
         </div>
+
     </section>
+
 </div>
 
+
 <script>
+
 let KEY = "";
 
-async function api(path, method="GET", body=null){
+
+async function api(
+    path,
+    method="GET",
+    body=null
+){
     const options = {
         method,
+
         headers:{
             "X-Admin-Key":KEY,
             "Content-Type":"application/json"
         }
     };
-    if(body !== null) options.body = JSON.stringify(body);
 
-    const response = await fetch(path,options);
+    if(body !== null){
+        options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(
+        path,
+        options
+    );
+
     let data = {};
-    try{data = await response.json()}catch(e){}
+
+    try{
+        data = await response.json();
+    }catch(e){}
 
     if(!response.ok){
-        throw new Error(data.detail || "요청에 실패했습니다.");
+        throw new Error(
+            data.detail || "요청에 실패했습니다."
+        );
     }
+
     return data;
 }
 
+
 function money(value){
-    return Number(value || 0).toLocaleString("ko-KR") + "원";
+    return (
+        Number(value || 0).toLocaleString("ko-KR")
+        + "원"
+    );
 }
+
 
 function number(value){
-    return Number(value || 0).toLocaleString("ko-KR");
+    return Number(
+        value || 0
+    ).toLocaleString("ko-KR");
 }
+
 
 function safe(value){
-    return String(value ?? "").replace(/[&<>"']/g, c => ({
-        "&":"&amp;",
-        "<":"&lt;",
-        ">":"&gt;",
-        '"':"&quot;",
-        "'":"&#39;"
-    }[c]));
+    return String(value ?? "").replace(
+        /[&<>"']/g,
+        c => ({
+            "&":"&amp;",
+            "<":"&lt;",
+            ">":"&gt;",
+            '"':"&quot;",
+            "'":"&#39;"
+        }[c])
+    );
 }
 
+
+// =====================================================
+// 관리자 로그인
+// =====================================================
+
 function login(){
-    KEY = document.getElementById("adminKey").value.trim();
+
+    KEY = document
+        .getElementById("adminKey")
+        .value
+        .trim();
+
     if(!KEY){
-        document.getElementById("loginMessage").textContent =
+
+        document
+            .getElementById("loginMessage")
+            .textContent =
             "관리자 키를 입력해 주세요.";
+
         return;
     }
 
-    document.getElementById("loginMessage").textContent =
+    document
+        .getElementById("loginMessage")
+        .textContent =
         "인증 확인 중...";
 
     Promise.all([
         api("/admin/stats")
     ]).then(()=>{
-        document.getElementById("loginPanel").classList.add("hidden");
-        document.getElementById("mainPanel").classList.remove("hidden");
+
+        document
+            .getElementById("loginPanel")
+            .classList.add("hidden");
+
+        document
+            .getElementById("mainPanel")
+            .classList.remove("hidden");
+
         loadStats();
         loadMembers();
         loadPayments();
         loadAnnouncements();
         loadUsage();
+
     }).catch(error=>{
+
         KEY = "";
-        document.getElementById("loginMessage").textContent = error.message;
+
+        document
+            .getElementById("loginMessage")
+            .textContent = error.message;
+
     });
+
 }
 
-function showTab(name,button){
-    document.querySelectorAll(".tab").forEach(item=>{
-        item.classList.add("hidden");
-    });
-    document.getElementById(name).classList.remove("hidden");
 
-    document.querySelectorAll(".tabs button").forEach(item=>{
-        item.classList.remove("active");
-    });
+// =====================================================
+// 탭 전환
+// =====================================================
+
+function showTab(
+    name,
+    button
+){
+
+    document
+        .querySelectorAll(".tab")
+        .forEach(item=>{
+            item.classList.add("hidden");
+        });
+
+    document
+        .getElementById(name)
+        .classList.remove("hidden");
+
+    document
+        .querySelectorAll(".tabs button")
+        .forEach(item=>{
+            item.classList.remove("active");
+        });
+
     button.classList.add("active");
+
 }
+
+
+// =====================================================
+// 통계
+// =====================================================
 
 async function loadStats(){
+
     try{
-        const data = await api("/admin/stats");
+
+        const data = await api(
+            "/admin/stats"
+        );
+
         const m = data.members;
         const u = data.usage;
 
-        document.getElementById("statCards").innerHTML = `
-            <div class="stat">전체 회원<strong>${number(m.total)}명</strong></div>
-            <div class="stat">프리미엄 회원<strong>${number(m.premium)}명</strong></div>
-            <div class="stat">무료 회원<strong>${number(m.free)}명</strong></div>
-            <div class="stat">정지 회원<strong>${number(m.suspended)}명</strong></div>
-            <div class="stat">승인 대기 결제<strong>${number(data.pending_payment_requests)}건</strong></div>
-        `;
+        document
+            .getElementById("statCards")
+            .innerHTML = `
 
-        document.getElementById("dailyStats").innerHTML =
-            data.daily_registrations.map(item=>`
-                <div class="notice">
-                    ${safe(item.date)} : <b>${number(item.count)}명</b>
-                </div>
-            `).join("");
-
-        document.getElementById("monthlyStats").innerHTML =
-            data.monthly_revenue.map(item=>`
-                <div class="notice">
-                    ${safe(item.month)} :
-                    <b>${money(item.revenue)}</b>
-                    <span class="small">
-                        · 유료 승인 ${number(item.paid_subscriptions)}건
-                    </span>
-                </div>
-            `).join("");
-
-        document.getElementById("totalUsage").innerHTML = `
-            <div class="grid">
-                <div class="stat">총 채팅<strong>${number(u.chat_count)}회</strong></div>
-                <div class="stat">입력 토큰<strong>${number(u.input_tokens)}</strong></div>
-                <div class="stat">출력 토큰<strong>${number(u.output_tokens)}</strong></div>
-                <div class="stat">전체 토큰<strong>${number(u.total_tokens)}</strong></div>
+            <div class="stat">
+                전체 회원
+                <strong>${number(m.total)}명</strong>
             </div>
+
+            <div class="stat">
+                프리미엄 회원
+                <strong>${number(m.premium)}명</strong>
+            </div>
+
+            <div class="stat">
+                무료 회원
+                <strong>${number(m.free)}명</strong>
+            </div>
+
+            <div class="stat">
+                정지 회원
+                <strong>${number(m.suspended)}명</strong>
+            </div>
+
+            <div class="stat">
+                승인 대기 결제
+                <strong>
+                    ${number(data.pending_payment_requests)}건
+                </strong>
+            </div>
+
         `;
+
+
+        document
+            .getElementById("dailyStats")
+            .innerHTML =
+            data.daily_registrations
+            .map(item=>`
+
+                <div class="notice">
+                    ${safe(item.date)}
+                    :
+                    <b>${number(item.count)}명</b>
+                </div>
+
+            `).join("");
+
+
+        document
+            .getElementById("monthlyStats")
+            .innerHTML =
+            data.monthly_revenue
+            .map(item=>`
+
+                <div class="notice">
+
+                    ${safe(item.month)}
+                    :
+
+                    <b>${money(item.revenue)}</b>
+
+                    <span class="small">
+                        · 유료 승인
+                        ${number(item.paid_subscriptions)}건
+                    </span>
+
+                </div>
+
+            `).join("");
+
+
+        document
+            .getElementById("totalUsage")
+            .innerHTML = `
+
+            <div class="grid">
+
+                <div class="stat">
+                    총 채팅
+                    <strong>${number(u.chat_count)}회</strong>
+                </div>
+
+                <div class="stat">
+                    입력 토큰
+                    <strong>${number(u.input_tokens)}</strong>
+                </div>
+
+                <div class="stat">
+                    출력 토큰
+                    <strong>${number(u.output_tokens)}</strong>
+                </div>
+
+                <div class="stat">
+                    전체 토큰
+                    <strong>${number(u.total_tokens)}</strong>
+                </div>
+
+            </div>
+
+        `;
+
     }catch(error){
+
         alert(error.message);
+
     }
+
 }
+
+
+// =====================================================
+// 회원 목록
+// =====================================================
 
 async function loadMembers(){
+
     try{
-        const search = document.getElementById("memberSearch").value;
-        const status = document.getElementById("memberStatus").value;
+
+        const search = document
+            .getElementById("memberSearch")
+            .value;
+
+        const status = document
+            .getElementById("memberStatus")
+            .value;
 
         const data = await api(
-            "/admin/members?search="+encodeURIComponent(search)+
-            "&status="+encodeURIComponent(status)
+            "/admin/members?search="
+            + encodeURIComponent(search)
+            + "&status="
+            + encodeURIComponent(status)
         );
 
-        document.getElementById("memberTable").innerHTML = `
+        document
+            .getElementById("memberTable")
+            .innerHTML = `
+
             <table>
-            <thead><tr>
-                <th>ID</th><th>아이디</th><th>상태</th>
-                <th>가입일</th><th>관리</th>
-            </tr></thead>
-            <tbody>
-            ${data.members.map(user=>`
-                <tr>
-                    <td>${user.id}</td>
-                    <td>${safe(user.username)}</td>
-                    <td>${user.is_active ?
-                        (user.is_premium ? "프리미엄" : "무료") :
-                        "정지"}
-                    </td>
-                    <td>${safe(user.created_at || "")}</td>
-                    <td>
-                        <button onclick="memberDetail(${user.id})">상세</button>
-                        ${user.is_active ?
-                            `<button class="red" onclick="memberAction(${user.id},'suspend')">정지</button>` :
-                            `<button onclick="memberAction(${user.id},'activate')">정지 해제</button>`
-                        }
-                    </td>
-                </tr>
-            `).join("")}
-            </tbody></table>
+
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>아이디</th>
+                        <th>상태</th>
+                        <th>가입일</th>
+                        <th>관리</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                ${data.members.map(user=>`
+
+                    <tr>
+
+                        <td>${user.id}</td>
+
+                        <td>${safe(user.username)}</td>
+
+                        <td>
+                            ${
+                                user.is_active
+                                ? (
+                                    user.is_premium
+                                    ? "프리미엄"
+                                    : "무료"
+                                )
+                                : "정지"
+                            }
+                        </td>
+
+                        <td>
+                            ${safe(user.created_at || "")}
+                        </td>
+
+                        <td>
+
+                            <button
+                                onclick="memberDetail(${user.id})"
+                            >
+                                상세
+                            </button>
+
+                            ${
+                                user.is_active
+                                ? `
+                                    <button
+                                        class="red"
+                                        onclick="memberAction(
+                                            ${user.id},
+                                            'suspend'
+                                        )"
+                                    >
+                                        정지
+                                    </button>
+                                `
+                                : `
+                                    <button
+                                        onclick="memberAction(
+                                            ${user.id},
+                                            'activate'
+                                        )"
+                                    >
+                                        정지 해제
+                                    </button>
+                                `
+                            }
+
+                        </td>
+
+                    </tr>
+
+                `).join("")}
+
+                </tbody>
+
+            </table>
+
         `;
+
     }catch(error){
+
         alert(error.message);
+
     }
+
 }
 
-async function memberAction(id,action){
-    const message = action === "suspend" ?
-        "이 회원을 정지할까요?" :
-        "이 회원의 정지를 해제할까요?";
 
-    if(!confirm(message)) return;
+// =====================================================
+// 회원 정지 및 해제
+// =====================================================
+
+async function memberAction(
+    id,
+    action
+){
+
+    const message =
+        action === "suspend"
+        ? "이 회원을 정지할까요?"
+        : "이 회원의 정지를 해제할까요?";
+
+    if(!confirm(message)){
+        return;
+    }
 
     try{
-        await api(`/admin/members/${id}/${action}`,"POST",{});
+
+        await api(
+            `/admin/members/${id}/${action}`,
+            "POST",
+            {}
+        );
+
         await loadMembers();
+
         alert("처리되었습니다.");
+
     }catch(error){
+
         alert(error.message);
+
     }
+
 }
+
+
+// =====================================================
+// 회원 상세 정보
+// =====================================================
 
 async function memberDetail(id){
+
     try{
-        const data = await api(`/admin/members/${id}`);
+
+        const data = await api(
+            `/admin/members/${id}`
+        );
+
         const user = data.member;
         const u = data.usage_summary;
 
-        document.getElementById("memberDetail").classList.remove("hidden");
-        document.getElementById("memberDetail").innerHTML = `
-            <h2>회원 상세 정보: ${safe(user.username)}</h2>
+        document
+            .getElementById("memberDetail")
+            .classList.remove("hidden");
+
+        document
+            .getElementById("memberDetail")
+            .innerHTML = `
+
+            <h2>
+                회원 상세 정보:
+                ${safe(user.username)}
+            </h2>
+
             <p>회원 ID: ${user.id}</p>
-            <p>계정 상태: ${user.is_active ? "정상" : "정지"}</p>
-            <p>구독 상태: ${safe(user.payment_status)}</p>
-            <p>채팅 횟수: ${number(u.chat_count)}회</p>
-            <p>입력 토큰: ${number(u.input_tokens)}</p>
-            <p>출력 토큰: ${number(u.output_tokens)}</p>
-            <p>총 토큰: ${number(u.total_tokens)}</p>
+
+            <p>
+                계정 상태:
+                ${user.is_active ? "정상" : "정지"}
+            </p>
+
+            <p>
+                구독 상태:
+                ${safe(user.payment_status)}
+            </p>
+
+            <p>
+                채팅 횟수:
+                ${number(u.chat_count)}회
+            </p>
+
+            <p>
+                입력 토큰:
+                ${number(u.input_tokens)}
+            </p>
+
+            <p>
+                출력 토큰:
+                ${number(u.output_tokens)}
+            </p>
+
+            <p>
+                총 토큰:
+                ${number(u.total_tokens)}
+            </p>
+
 
             <h3>구독 지급</h3>
-            <input id="grantDays" type="number" min="1" max="3650" value="30">
-            <button onclick="grantSubscription(${user.id})">구독 지급</button>
-            <button class="red" onclick="revokeSubscription(${user.id})">구독 회수</button>
+
+            <input
+                id="grantDays"
+                type="number"
+                min="1"
+                max="3650"
+                value="30"
+            >
+
+            <button
+                onclick="grantSubscription(${user.id})"
+            >
+                구독 지급
+            </button>
+
+            <button
+                class="red"
+                onclick="revokeSubscription(${user.id})"
+            >
+                구독 회수
+            </button>
+
 
             <h3>최근 사용 기록</h3>
+
             <div class="table-wrap">
-            <table>
-            <tr><th>시간</th><th>모델</th><th>입력</th><th>출력</th><th>합계</th></tr>
-            ${data.recent_usage.map(item=>`
-                <tr>
-                    <td>${safe(item.created_at || "")}</td>
-                    <td>${safe(item.model)}</td>
-                    <td>${number(item.input_tokens)}</td>
-                    <td>${number(item.output_tokens)}</td>
-                    <td>${number(item.total_tokens)}</td>
-                </tr>
-            `).join("")}
-            </table></div>
+
+                <table>
+
+                    <tr>
+                        <th>시간</th>
+                        <th>모델</th>
+                        <th>입력</th>
+                        <th>출력</th>
+                        <th>합계</th>
+                    </tr>
+
+                    ${data.recent_usage.map(item=>`
+
+                        <tr>
+
+                            <td>
+                                ${safe(item.created_at || "")}
+                            </td>
+
+                            <td>${safe(item.model)}</td>
+
+                            <td>${number(item.input_tokens)}</td>
+
+                            <td>${number(item.output_tokens)}</td>
+
+                            <td>${number(item.total_tokens)}</td>
+
+                        </tr>
+
+                    `).join("")}
+
+                </table>
+
+            </div>
+
         `;
+
     }catch(error){
+
         alert(error.message);
+
     }
+
 }
+
+
+// =====================================================
+// 구독 지급
+// =====================================================
 
 async function grantSubscription(id){
-    const days = Number(document.getElementById("grantDays").value);
-    if(!Number.isInteger(days) || days < 1 || days > 3650){
-        alert("1일에서 3650일 사이로 입력해 주세요.");
-        return;
-    }
-    if(!confirm(`${days}일 구독을 지급할까요?`)) return;
 
-    try{
-        await api(`/admin/members/${id}/grant-subscription`,"POST",{days});
-        alert("구독을 지급했습니다.");
-        memberDetail(id);
-        loadMembers();
-        loadStats();
-    }catch(error){
-        alert(error.message);
-    }
-}
+    const days = Number(
+        document.getElementById("grantDays").value
+    );
 
-async function revokeSubscription(id){
-    if(!confirm("이 회원의 구독을 회수할까요?")) return;
+    if(
+        !Number.isInteger(days)
+        || days < 1
+        || days > 3650
+    ){
 
-    try{
-        await api(`/admin/members/${id}/revoke-subscription`,"POST",{});
-        alert("구독을 회수했습니다.");
-        memberDetail(id);
-        loadMembers();
-        loadStats();
-    }catch(error){
-        alert(error.message);
-    }
-}
-
-async function loadPayments(){
-    try{
-        const status = document.getElementById("paymentStatus").value;
-        const data = await api(
-            "/admin/subscription-requests?status="+encodeURIComponent(status)
+        alert(
+            "1일에서 3650일 사이로 입력해 주세요."
         );
 
-        document.getElementById("paymentTable").innerHTML = `
-            <table>
-            <tr>
-                <th>신청 ID</th><th>회원</th><th>입금자명</th>
-                <th>금액</th><th>상태</th><th>신청일</th><th>처리</th>
-            </tr>
-            ${data.requests.map(item=>`
-                <tr>
-                    <td>${item.id}</td>
-                    <td>${safe(item.username)}</td>
-                    <td>${safe(item.depositor_name)}</td>
-                    <td>${money(item.amount)}</td>
-                    <td>${safe(item.status)}</td>
-                    <td>${safe(item.created_at || "")}</td>
-                    <td>
-                        ${item.status === "pending" ? `
-                            <button onclick="paymentAction(${item.id},'approve')">승인</button>
-                            <button class="red" onclick="paymentAction(${item.id},'reject')">거절</button>
-                        ` : "-"}
-                    </td>
-                </tr>
-            `).join("")}
-            </table>
-        `;
-    }catch(error){
-        alert(error.message);
+        return;
     }
-}
 
-async function paymentAction(id,action){
-    const label = action === "approve" ? "승인" : "거절";
-    if(!confirm(`이 입금 신청을 ${label}할까요?`)) return;
+    if(
+        !confirm(
+            `${days}일 구독을 지급할까요?`
+        )
+    ){
+        return;
+    }
 
     try{
+
+        await api(
+            `/admin/members/${id}/grant-subscription`,
+            "POST",
+            {days}
+        );
+
+        alert("구독을 지급했습니다.");
+
+        memberDetail(id);
+        loadMembers();
+        loadStats();
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+
+}
+
+
+// =====================================================
+// 구독 회수
+// =====================================================
+
+async function revokeSubscription(id){
+
+    if(
+        !confirm(
+            "이 회원의 구독을 회수할까요?"
+        )
+    ){
+        return;
+    }
+
+    try{
+
+        await api(
+            `/admin/members/${id}/revoke-subscription`,
+            "POST",
+            {}
+        );
+
+        alert("구독을 회수했습니다.");
+
+        memberDetail(id);
+        loadMembers();
+        loadStats();
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+
+}
+
+
+// =====================================================
+// 입금 신청 목록
+// =====================================================
+
+async function loadPayments(){
+
+    try{
+
+        const status = document
+            .getElementById("paymentStatus")
+            .value;
+
+        const data = await api(
+            "/admin/subscription-requests?status="
+            + encodeURIComponent(status)
+        );
+
+        document
+            .getElementById("paymentTable")
+            .innerHTML = `
+
+            <table>
+
+                <tr>
+                    <th>신청 ID</th>
+                    <th>회원</th>
+                    <th>입금자명</th>
+                    <th>금액</th>
+                    <th>상태</th>
+                    <th>신청일</th>
+                    <th>처리</th>
+                </tr>
+
+                ${data.requests.map(item=>`
+
+                    <tr>
+
+                        <td>${item.id}</td>
+
+                        <td>${safe(item.username)}</td>
+
+                        <td>
+                            ${safe(item.depositor_name)}
+                        </td>
+
+                        <td>${money(item.amount)}</td>
+
+                        <td>${safe(item.status)}</td>
+
+                        <td>
+                            ${safe(item.created_at || "")}
+                        </td>
+
+                        <td>
+
+                            ${
+                                item.status === "pending"
+                                ? `
+
+                                    <button
+                                        onclick="paymentAction(
+                                            ${item.id},
+                                            'approve'
+                                        )"
+                                    >
+                                        승인
+                                    </button>
+
+                                    <button
+                                        class="red"
+                                        onclick="paymentAction(
+                                            ${item.id},
+                                            'reject'
+                                        )"
+                                    >
+                                        거절
+                                    </button>
+
+                                `
+                                : "-"
+                            }
+
+                        </td>
+
+                    </tr>
+
+                `).join("")}
+
+            </table>
+
+        `;
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+
+}
+
+
+// =====================================================
+// 입금 승인 및 거절
+// =====================================================
+
+async function paymentAction(
+    id,
+    action
+){
+
+    const label =
+        action === "approve"
+        ? "승인"
+        : "거절";
+
+    if(
+        !confirm(
+            `이 입금 신청을 ${label}할까요?`
+        )
+    ){
+        return;
+    }
+
+    try{
+
         await api(
             `/admin/subscription-requests/${id}/${action}`,
             "POST",
             {}
         );
+
         alert("처리되었습니다.");
+
         loadPayments();
         loadStats();
         loadMembers();
+
     }catch(error){
+
         alert(error.message);
+
     }
+
 }
+
+
+// =====================================================
+// 공지사항 입력 초기화
+// =====================================================
 
 function clearAnnouncementForm(){
-    document.getElementById("announcementId").value = "";
-    document.getElementById("announcementTitle").value = "";
-    document.getElementById("announcementContent").value = "";
-    document.getElementById("announcementPublished").checked = true;
-    document.getElementById("announcementImportant").checked = false;
+
+    document
+        .getElementById("announcementId")
+        .value = "";
+
+    document
+        .getElementById("announcementTitle")
+        .value = "";
+
+    document
+        .getElementById("announcementContent")
+        .value = "";
+
+    document
+        .getElementById("announcementPublished")
+        .checked = true;
+
+    document
+        .getElementById("announcementImportant")
+        .checked = false;
+
 }
+
+
+// =====================================================
+// 공지사항 목록
+// =====================================================
 
 async function loadAnnouncements(){
-    try{
-        const data = await api("/admin/announcements");
 
-        document.getElementById("announcementList").innerHTML =
-            data.announcements.map(item=>`
+    try{
+
+        const data = await api(
+            "/admin/announcements"
+        );
+
+        document
+            .getElementById("announcementList")
+            .innerHTML =
+            data.announcements
+            .map(item=>`
+
                 <div class="notice">
-                    <b>${item.is_important ? "⭐ 중요 · " : ""}${safe(item.title)}</b>
-                    <p>${safe(item.content).replace(/\n/g,"<br>")}</p>
-                    <p class="small">
-                        ${item.is_published ? "게시 중" : "비공개"}
-                        · ${safe(item.created_at || "")}
+
+                    <b>
+                        ${
+                            item.is_important
+                            ? "⭐ 중요 · "
+                            : ""
+                        }
+
+                        ${safe(item.title)}
+                    </b>
+
+                    <p>
+                        ${safe(item.content).replace(
+                            /\n/g,
+                            "<br>"
+                        )}
                     </p>
-                    <button onclick="editAnnouncement(${item.id})">수정</button>
-                    <button class="red" onclick="deleteAnnouncement(${item.id})">삭제</button>
+
+                    <p class="small">
+
+                        ${
+                            item.is_published
+                            ? "게시 중"
+                            : "비공개"
+                        }
+
+                        ·
+
+                        ${safe(item.created_at || "")}
+
+                    </p>
+
+                    <button
+                        onclick="editAnnouncement(${item.id})"
+                    >
+                        수정
+                    </button>
+
+                    <button
+                        class="red"
+                        onclick="deleteAnnouncement(${item.id})"
+                    >
+                        삭제
+                    </button>
+
                 </div>
+
             `).join("");
+
     }catch(error){
+
         alert(error.message);
+
     }
+
 }
 
+
+// =====================================================
+// 공지사항 저장 및 수정
+// =====================================================
+
 async function saveAnnouncement(){
-    const id = document.getElementById("announcementId").value;
+
+    const id = document
+        .getElementById("announcementId")
+        .value;
+
     const body = {
-        title:document.getElementById("announcementTitle").value.trim(),
-        content:document.getElementById("announcementContent").value.trim(),
-        is_published:document.getElementById("announcementPublished").checked,
-        is_important:document.getElementById("announcementImportant").checked
+
+        title: document
+            .getElementById("announcementTitle")
+            .value
+            .trim(),
+
+        content: document
+            .getElementById("announcementContent")
+            .value
+            .trim(),
+
+        is_published: document
+            .getElementById("announcementPublished")
+            .checked,
+
+        is_important: document
+            .getElementById("announcementImportant")
+            .checked
+
     };
 
-    if(!body.title || !body.content){
-        alert("제목과 내용을 입력해 주세요.");
+    if(
+        !body.title
+        || !body.content
+    ){
+
+        alert(
+            "제목과 내용을 입력해 주세요."
+        );
+
         return;
     }
 
     try{
+
         if(id){
-            await api(`/admin/announcements/${id}`,"PUT",body);
+
+            await api(
+                `/admin/announcements/${id}`,
+                "PUT",
+                body
+            );
+
         }else{
-            await api("/admin/announcements","POST",body);
+
+            await api(
+                "/admin/announcements",
+                "POST",
+                body
+            );
+
         }
+
         clearAnnouncementForm();
+
         loadAnnouncements();
-        alert("공지사항을 저장했습니다.");
-    }catch(error){
-        alert(error.message);
-    }
-}
 
-async function editAnnouncement(id){
-    try{
-        const data = await api("/admin/announcements");
-        const item = data.announcements.find(x=>x.id === id);
-        if(!item) return;
-
-        document.getElementById("announcementId").value = item.id;
-        document.getElementById("announcementTitle").value = item.title;
-        document.getElementById("announcementContent").value = item.content;
-        document.getElementById("announcementPublished").checked = item.is_published;
-        document.getElementById("announcementImportant").checked = item.is_important;
-
-        window.scrollTo({top:0,behavior:"smooth"});
-    }catch(error){
-        alert(error.message);
-    }
-}
-
-async function deleteAnnouncement(id){
-    if(!confirm("이 공지사항을 삭제할까요?")) return;
-
-    try{
-        await api(`/admin/announcements/${id}`,"DELETE");
-        loadAnnouncements();
-        alert("삭제했습니다.");
-    }catch(error){
-        alert(error.message);
-    }
-}
-
-async function loadUsage(){
-    try{
-        const search = document.getElementById("usageSearch").value;
-        const data = await api(
-            "/admin/usage?search="+encodeURIComponent(search)
+        alert(
+            "공지사항을 저장했습니다."
         );
 
-        document.getElementById("usageTable").innerHTML = `
-            <table>
-            <tr>
-                <th>회원</th><th>채팅</th><th>입력 토큰</th>
-                <th>출력 토큰</th><th>전체 토큰</th>
-            </tr>
-            ${data.usage.map(item=>`
-                <tr>
-                    <td>
-                        <a href="#" onclick="memberDetail(${item.user_id});return false;"
-                           style="color:#67e8f9">
-                            ${safe(item.username)}
-                        </a>
-                    </td>
-                    <td>${number(item.chat_count)}</td>
-                    <td>${number(item.input_tokens)}</td>
-                    <td>${number(item.output_tokens)}</td>
-                    <td>${number(item.total_tokens)}</td>
-                </tr>
-            `).join("")}
-            </table>
-        `;
     }catch(error){
+
         alert(error.message);
+
     }
+
 }
+
+
+// =====================================================
+// 공지사항 수정 불러오기
+// =====================================================
+
+async function editAnnouncement(id){
+
+    try{
+
+        const data = await api(
+            "/admin/announcements"
+        );
+
+        const item = data.announcements.find(
+            x => x.id === id
+        );
+
+        if(!item){
+            return;
+        }
+
+        document
+            .getElementById("announcementId")
+            .value = item.id;
+
+        document
+            .getElementById("announcementTitle")
+            .value = item.title;
+
+        document
+            .getElementById("announcementContent")
+            .value = item.content;
+
+        document
+            .getElementById("announcementPublished")
+            .checked = item.is_published;
+
+        document
+            .getElementById("announcementImportant")
+            .checked = item.is_important;
+
+        window.scrollTo({
+            top:0,
+            behavior:"smooth"
+        });
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+
+}
+
+
+// =====================================================
+// 공지사항 삭제
+// =====================================================
+
+async function deleteAnnouncement(id){
+
+    if(
+        !confirm(
+            "이 공지사항을 삭제할까요?"
+        )
+    ){
+        return;
+    }
+
+    try{
+
+        await api(
+            `/admin/announcements/${id}`,
+            "DELETE"
+        );
+
+        loadAnnouncements();
+
+        alert("삭제했습니다.");
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+
+}
+
+
+// =====================================================
+// 회원별 AI 사용량
+// =====================================================
+
+async function loadUsage(){
+
+    try{
+
+        const search = document
+            .getElementById("usageSearch")
+            .value;
+
+        const data = await api(
+            "/admin/usage?search="
+            + encodeURIComponent(search)
+        );
+
+        document
+            .getElementById("usageTable")
+            .innerHTML = `
+
+            <table>
+
+                <tr>
+                    <th>회원</th>
+                    <th>채팅</th>
+                    <th>입력 토큰</th>
+                    <th>출력 토큰</th>
+                    <th>전체 토큰</th>
+                </tr>
+
+                ${data.usage.map(item=>`
+
+                    <tr>
+
+                        <td>
+
+                            <a
+                                href="#"
+                                onclick="
+                                    memberDetail(${item.user_id});
+                                    return false;
+                                "
+                                style="color:#67e8f9"
+                            >
+                                ${safe(item.username)}
+                            </a>
+
+                        </td>
+
+                        <td>
+                            ${number(item.chat_count)}
+                        </td>
+
+                        <td>
+                            ${number(item.input_tokens)}
+                        </td>
+
+                        <td>
+                            ${number(item.output_tokens)}
+                        </td>
+
+                        <td>
+                            ${number(item.total_tokens)}
+                        </td>
+
+                    </tr>
+
+                `).join("")}
+
+            </table>
+
+        `;
+
+    }catch(error){
+
+        alert(error.message);
+
+    }
+
+}
+
 </script>
+
 </body>
 </html>
 """
 
 
-@app.get("/admin", response_class=HTMLResponse)
+# =========================================================
+# 관리자 웹 페이지 연결
+# =========================================================
+
+@app.get(
+    "/admin",
+    response_class=HTMLResponse,
+)
 def admin_page():
     return ADMIN_HTML
