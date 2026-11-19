@@ -1,3 +1,4 @@
+
 import os
 import secrets
 import hashlib
@@ -34,7 +35,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
-# 새 관리자 로그인 환경변수
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
@@ -346,7 +346,6 @@ def get_current_user(
     return user
 
 
-# 새 관리자 JWT 인증
 def require_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
@@ -1943,7 +1942,8 @@ async function login(){
         ADMIN_TOKEN = data.token;
         sessionStorage.setItem("ekko_admin_token", ADMIN_TOKEN);
 
-        await api("/admin/auth/verify");
+        // 수정: 인증 확인은 POST 방식으로 요청
+        await api("/admin/auth/verify", "POST", {});
 
         document.getElementById("adminPassword").value = "";
         showMain();
@@ -2524,7 +2524,9 @@ async function initializeAdmin(){
     }
 
     try{
-        await api("/admin/auth/verify");
+        // 수정: 기존 토큰 인증 확인도 POST 방식으로 요청
+        await api("/admin/auth/verify", "POST", {});
+
         showMain();
         await loadAll();
 
