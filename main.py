@@ -24,6 +24,7 @@ from sqlalchemy import (
     inspect,
     text,
     func,
+    delete,
 )
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -65,7 +66,6 @@ if not JWT_SECRET:
         "JWT_SECRET 환경 변수가 설정되지 않았습니다."
     )
 
-# Railway PostgreSQL 주소 호환 처리
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace(
         "postgres://",
@@ -338,7 +338,6 @@ class Announcement(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# 기존 users 테이블에 is_active가 없는 경우에만 추가
 try:
     inspector = inspect(engine)
 
@@ -614,6 +613,10 @@ class AnnouncementRequest(BaseModel):
     is_important: bool = False
 
 
+class DeleteAllMembersRequest(BaseModel):
+    confirm_phrase: str
+
+
 # =========================================================
 # 기본 및 상태 확인
 # =========================================================
@@ -812,7 +815,7 @@ def create_transfer_request(
 
 
 # =========================================================
-# 공지사항 - 에코 AI 앱에서 조회
+# 공지사항 - 앱 조회
 # =========================================================
 
 @app.get("/announcements")
@@ -846,7 +849,7 @@ def get_announcements(
 
 
 # =========================================================
-# AI 채팅 및 실제 토큰 사용량 기록
+# AI 채팅 및 토큰 사용량
 # =========================================================
 
 @app.post("/chat")
@@ -893,19 +896,11 @@ def chat(
         )
 
         input_tokens = int(
-            getattr(
-                usage,
-                "input_tokens",
-                0,
-            ) or 0
+            getattr(usage, "input_tokens", 0) or 0
         )
 
         output_tokens = int(
-            getattr(
-                usage,
-                "output_tokens",
-                0,
-            ) or 0
+            getattr(usage, "output_tokens", 0) or 0
         )
 
         total_tokens = int(
@@ -1131,6 +1126,86 @@ def admin_reject_payment(
 
 
 # =========================================================
+# 관리자 - 회원 전체 삭제
+# =========================================================
+
+@app.post("/admin/members/delete-all")
+def admin_delete_all_members(
+    request: DeleteAllMembersRequest,
+    admin=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    if request.confirm_phrase != "DELETE ALL MEMBERS":
+        raise HTTPException(
+            status_code=400,
+            detail="삭제 확인 문구가 일치하지 않습니다.",
+        )
+
+    try:
+        user_count = db.scalar(
+            select(func.count(User.id))
+        ) or 0
+
+        subscription_count = db.scalar(
+            select(func.count(Subscription.id))
+        ) or 0
+
+        payment_count = db.scalar(
+            select(func.count(PaymentRequest.id))
+        ) or 0
+
+        usage_count = db.scalar(
+            select(func.count(ChatUsage.id))
+        ) or 0
+
+        # 외래 키 관계에 맞춰 순서대로 삭제
+        db.execute(delete(Subscription))
+        db.execute(delete(PaymentRequest))
+        db.execute(delete(ChatUsage))
+        db.execute(delete(User))
+
+        db.commit()
+
+        print(
+            "관리자 전체 회원 삭제 완료:",
+            {
+                "users": user_count,
+                "subscriptions": subscription_count,
+                "payments": payment_count,
+                "chat_usage": usage_count,
+            },
+        )
+
+        return {
+            "success": True,
+            "message": "전체 회원 데이터가 삭제되었습니다.",
+            "deleted": {
+                "users": user_count,
+                "subscriptions": subscription_count,
+                "payment_requests": payment_count,
+                "chat_usage": usage_count,
+            },
+            "preserved": {
+                "announcements": True,
+                "database_tables": True,
+            },
+        }
+
+    except Exception as error:
+        db.rollback()
+
+        print(
+            "전체 회원 삭제 오류:",
+            str(error),
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="삭제 작업에 실패했습니다. 데이터 변경은 롤백되었습니다.",
+        )
+
+
+# =========================================================
 # 관리자 - 회원 관리
 # =========================================================
 
@@ -1267,11 +1342,7 @@ def admin_member_detail(
 
     return {
         "success": True,
-
-        "member": user_to_dict(
-            db,
-            user,
-        ),
+        "member": user_to_dict(db, user),
 
         "payments": [
             {
@@ -1296,18 +1367,10 @@ def admin_member_detail(
         ],
 
         "usage_summary": {
-            "chat_count": int(
-                usage_summary[0] or 0
-            ),
-            "input_tokens": int(
-                usage_summary[1] or 0
-            ),
-            "output_tokens": int(
-                usage_summary[2] or 0
-            ),
-            "total_tokens": int(
-                usage_summary[3] or 0
-            ),
+            "chat_count": int(usage_summary[0] or 0),
+            "input_tokens": int(usage_summary[1] or 0),
+            "output_tokens": int(usage_summary[2] or 0),
+            "total_tokens": int(usage_summary[3] or 0),
         },
 
         "recent_usage": [
@@ -1370,7 +1433,6 @@ def admin_grant_subscription(
     else:
         start_time = now
 
-    # 관리자 지급은 실제 결제가 아니므로 amount=0
     payment = PaymentRequest(
         user_id=user_id,
         depositor_name="관리자 수동 지급",
@@ -1401,9 +1463,7 @@ def admin_grant_subscription(
 
     return {
         "success": True,
-        "message": (
-            f"{request.days}일 구독을 지급했습니다."
-        ),
+        "message": f"{request.days}일 구독을 지급했습니다.",
     }
 
 
@@ -1469,7 +1529,6 @@ def admin_suspend_member(
         )
 
     user.is_active = False
-
     db.commit()
 
     return {
@@ -1498,7 +1557,6 @@ def admin_activate_member(
         )
 
     user.is_active = True
-
     db.commit()
 
     return {
@@ -1508,7 +1566,7 @@ def admin_activate_member(
 
 
 # =========================================================
-# 관리자 - 통계 대시보드 API
+# 관리자 - 통계 대시보드
 # =========================================================
 
 @app.get("/admin/stats")
@@ -1526,8 +1584,7 @@ def admin_stats(
     total_members = len(users)
 
     suspended_members = sum(
-        1
-        for user in users
+        1 for user in users
         if not user.is_active
     )
 
@@ -1550,13 +1607,8 @@ def admin_stats(
         - premium_members,
     )
 
-    # -----------------------------------------------------
     # 최근 7일 가입자
-    # -----------------------------------------------------
-
-    registration_start = (
-        now - timedelta(days=6)
-    )
+    registration_start = now - timedelta(days=6)
 
     recent_users = db.scalars(
         select(User).where(
@@ -1567,18 +1619,14 @@ def admin_stats(
     daily_registrations = defaultdict(int)
 
     for offset in range(7):
-        day = today - timedelta(
-            days=6 - offset
-        )
+        day = today - timedelta(days=6 - offset)
 
         daily_registrations[
             day.isoformat()
         ] = 0
 
     for user in recent_users:
-        created = make_aware(
-            user.created_at
-        )
+        created = make_aware(user.created_at)
 
         if created:
             key = created.date().isoformat()
@@ -1586,27 +1634,15 @@ def admin_stats(
             if key in daily_registrations:
                 daily_registrations[key] += 1
 
-    # -----------------------------------------------------
     # 최근 6개월 달력 기준 매출 통계
-    # -----------------------------------------------------
-
     current_month_index = (
-        now.year * 12
-        + now.month
-        - 1
+        now.year * 12 + now.month - 1
     )
 
-    first_month_index = (
-        current_month_index - 5
-    )
+    first_month_index = current_month_index - 5
 
-    first_year = (
-        first_month_index // 12
-    )
-
-    first_month = (
-        first_month_index % 12 + 1
-    )
+    first_year = first_month_index // 12
+    first_month = first_month_index % 12 + 1
 
     six_month_start = datetime(
         first_year,
@@ -1616,14 +1652,10 @@ def admin_stats(
     )
 
     monthly_revenue = defaultdict(int)
-
     monthly_paid_subscriptions = defaultdict(int)
 
-    # 최근 6개월을 오래된 달부터 생성
     for offset in range(5, -1, -1):
-        month_index = (
-            current_month_index - offset
-        )
+        month_index = current_month_index - offset
 
         year = month_index // 12
         month = month_index % 12 + 1
@@ -1631,10 +1663,8 @@ def admin_stats(
         key = f"{year:04d}-{month:02d}"
 
         monthly_revenue[key] = 0
-
         monthly_paid_subscriptions[key] = 0
 
-    # 실제 승인된 유료 결제 조회
     approved_payments = db.scalars(
         select(PaymentRequest).where(
             PaymentRequest.status == "approved",
@@ -1644,8 +1674,7 @@ def admin_stats(
 
     for payment in approved_payments:
         approved_time = make_aware(
-            payment.reviewed_at
-            or payment.created_at
+            payment.reviewed_at or payment.created_at
         )
 
         if not approved_time:
@@ -1654,9 +1683,7 @@ def admin_stats(
         if approved_time < six_month_start:
             continue
 
-        key = month_key(
-            approved_time
-        )
+        key = month_key(approved_time)
 
         if key in monthly_revenue:
             monthly_revenue[key] += int(
@@ -1665,36 +1692,23 @@ def admin_stats(
 
             monthly_paid_subscriptions[key] += 1
 
-    # -----------------------------------------------------
-    # 승인 대기 결제
-    # -----------------------------------------------------
-
     pending_count = db.scalar(
-        select(
-            func.count(PaymentRequest.id)
-        ).where(
+        select(func.count(PaymentRequest.id)).where(
             PaymentRequest.status == "pending"
         )
     ) or 0
 
-    # -----------------------------------------------------
-    # 전체 AI 사용량
-    # -----------------------------------------------------
-
     usage_summary = db.execute(
         select(
             func.count(ChatUsage.id),
-
             func.coalesce(
                 func.sum(ChatUsage.input_tokens),
                 0,
             ),
-
             func.coalesce(
                 func.sum(ChatUsage.output_tokens),
                 0,
             ),
-
             func.coalesce(
                 func.sum(ChatUsage.total_tokens),
                 0,
@@ -1717,50 +1731,31 @@ def admin_stats(
                 "date": key,
                 "count": daily_registrations[key],
             }
-            for key in sorted(
-                daily_registrations.keys()
-            )
+            for key in sorted(daily_registrations.keys())
         ],
 
         "monthly_revenue": [
             {
                 "month": key,
                 "revenue": monthly_revenue[key],
-                "paid_subscriptions": (
-                    monthly_paid_subscriptions[key]
-                ),
+                "paid_subscriptions": monthly_paid_subscriptions[key],
             }
-            for key in sorted(
-                monthly_revenue.keys()
-            )
+            for key in sorted(monthly_revenue.keys())
         ],
 
-        "pending_payment_requests": int(
-            pending_count
-        ),
+        "pending_payment_requests": int(pending_count),
 
         "usage": {
-            "chat_count": int(
-                usage_summary[0] or 0
-            ),
-
-            "input_tokens": int(
-                usage_summary[1] or 0
-            ),
-
-            "output_tokens": int(
-                usage_summary[2] or 0
-            ),
-
-            "total_tokens": int(
-                usage_summary[3] or 0
-            ),
+            "chat_count": int(usage_summary[0] or 0),
+            "input_tokens": int(usage_summary[1] or 0),
+            "output_tokens": int(usage_summary[2] or 0),
+            "total_tokens": int(usage_summary[3] or 0),
         },
     }
 
 
 # =========================================================
-# 관리자 - 회원별 사용량 API
+# 관리자 - 회원별 사용량
 # =========================================================
 
 @app.get("/admin/usage")
@@ -1827,22 +1822,10 @@ def admin_usage(
             {
                 "user_id": row.id,
                 "username": row.username,
-
-                "chat_count": int(
-                    row.chat_count or 0
-                ),
-
-                "input_tokens": int(
-                    row.input_tokens or 0
-                ),
-
-                "output_tokens": int(
-                    row.output_tokens or 0
-                ),
-
-                "total_tokens": int(
-                    row.total_tokens or 0
-                ),
+                "chat_count": int(row.chat_count or 0),
+                "input_tokens": int(row.input_tokens or 0),
+                "output_tokens": int(row.output_tokens or 0),
+                "total_tokens": int(row.total_tokens or 0),
             }
             for row in rows
         ],
@@ -1912,9 +1895,7 @@ def admin_create_announcement(
     }
 
 
-@app.put(
-    "/admin/announcements/{announcement_id}"
-)
+@app.put("/admin/announcements/{announcement_id}")
 def admin_update_announcement(
     announcement_id: int,
     request: AnnouncementRequest,
@@ -1946,9 +1927,7 @@ def admin_update_announcement(
     }
 
 
-@app.delete(
-    "/admin/announcements/{announcement_id}"
-)
+@app.delete("/admin/announcements/{announcement_id}")
 def admin_delete_announcement(
     announcement_id: int,
     admin=Depends(require_admin),
@@ -2132,6 +2111,19 @@ th{
     margin:8px 0
 }
 
+.danger-panel{
+    border:1px solid #a83255;
+    background:#291321;
+    border-radius:12px;
+    padding:15px;
+    margin-top:18px
+}
+
+.danger-panel h3{
+    color:#ff829c;
+    margin-top:0
+}
+
 @media(max-width:600px){
     body{
         padding:12px
@@ -2299,6 +2291,29 @@ th{
                 class="table-wrap"
                 id="memberTable"
             ></div>
+
+            <div class="danger-panel">
+
+                <h3>⚠ 전체 회원 데이터 삭제</h3>
+
+                <p>
+                    모든 회원 계정과 구독, 입금 신청,
+                    AI 사용 기록이 삭제됩니다.
+                </p>
+
+                <p class="small">
+                    공지사항과 데이터베이스 구조는 보존됩니다.
+                    이 작업은 되돌릴 수 없습니다.
+                </p>
+
+                <button
+                    class="red"
+                    onclick="deleteAllMembers()"
+                >
+                    전체 회원 및 회원 데이터 삭제
+                </button>
+
+            </div>
 
         </div>
 
@@ -2869,6 +2884,71 @@ async function loadMembers(){
     }catch(error){
 
         alert(error.message);
+
+    }
+
+}
+
+
+// =====================================================
+// 전체 회원 및 회원 데이터 삭제
+// =====================================================
+
+async function deleteAllMembers(){
+
+    const first = confirm(
+        "정말 모든 회원 계정과 회원별 구독, 결제 신청, AI 사용 기록을 삭제할까요?\n\n"
+        + "새로 만든 계정도 포함됩니다.\n"
+        + "이 작업은 되돌릴 수 없습니다."
+    );
+
+    if(!first){
+        return;
+    }
+
+    const phrase = prompt(
+        "삭제를 진행하려면 아래 문구를 정확하게 입력하세요.\n\n"
+        + "DELETE ALL MEMBERS"
+    );
+
+    if(phrase !== "DELETE ALL MEMBERS"){
+        alert("확인 문구가 일치하지 않아 취소되었습니다.");
+        return;
+    }
+
+    try{
+
+        const result = await api(
+            "/admin/members/delete-all",
+            "POST",
+            {
+                confirm_phrase: phrase
+            }
+        );
+
+        alert(
+            "회원 데이터 삭제가 완료되었습니다.\n\n"
+            + "회원: " + number(result.deleted.users) + "명\n"
+            + "구독: " + number(result.deleted.subscriptions) + "건\n"
+            + "입금 신청: " + number(result.deleted.payment_requests) + "건\n"
+            + "AI 사용 기록: " + number(result.deleted.chat_usage) + "건\n\n"
+            + "공지사항은 보존되었습니다."
+        );
+
+        document
+            .getElementById("memberDetail")
+            .classList.add("hidden");
+
+        await loadMembers();
+        await loadStats();
+        await loadPayments();
+        await loadUsage();
+
+    }catch(error){
+
+        alert(
+            "삭제 실패:\n" + error.message
+        );
 
     }
 
